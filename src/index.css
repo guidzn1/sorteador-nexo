@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  background-color: #050810;
+}
+
+body {
+  @apply font-body text-ink antialiased;
+}
+
+::selection {
+  background-color: #2F6FED;
+  color: #EAF1FB;
+}
+
+:focus-visible {
+  outline: 2px solid #2F6FED;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.dot-pulse {
+  animation: dot-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(47,111,237,0.55); }
+  50% { box-shadow: 0 0 0 10px rgba(47,111,237,0); }
+}

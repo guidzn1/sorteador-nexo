@@ -1,0 +1,96 @@
+rules_version = '2';
+
+// =============================================================
+// Nexo · Sorteios — Regras de segurança do Firestore
+//
+// Antes de publicar estas regras, crie manualmente no Firestore:
+// collection: admins
+// document id: UID do usuário admin do Firebase Authentication
+// campos opcionais: email, name, createdAt
+// =============================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function eventExists(eventSlug) {
+      return exists(/databases/$(database)/documents/events/$(eventSlug));
+    }
+
+    function eventIsActive(eventSlug) {
+      return eventExists(eventSlug)
+        && get(/databases/$(database)/documents/events/$(eventSlug)).data.active == true;
+    }
+
+    function validEventData() {
+      return request.resource.data.keys().hasOnly([
+          'name', 'slug', 'description', 'active', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll(['name', 'slug', 'active'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 3
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.slug is string
+        && request.resource.data.slug.matches('^[a-z0-9-]{3,80}$')
+        && request.resource.data.active is bool;
+    }
+
+    function validParticipantData(whatsapp) {
+      return request.resource.data.keys().hasOnly([
+          'fullName', 'whatsapp', 'instagram', 'sport', 'createdAt'
+        ])
+        && request.resource.data.keys().hasAll(['fullName', 'whatsapp', 'createdAt'])
+        && request.resource.data.fullName is string
+        && request.resource.data.fullName.size() >= 3
+        && request.resource.data.fullName.size() <= 120
+        && request.resource.data.whatsapp == whatsapp
+        && request.resource.data.whatsapp.matches('^[0-9]{10,11}$')
+        && request.resource.data.createdAt == request.time;
+    }
+
+    match /admins/{adminId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /events/{eventSlug} {
+      // Visitantes conseguem abrir/listar apenas sorteios ativos.
+      // Admins conseguem ver todos, inclusive encerrados.
+      allow read: if isAdmin() || resource.data.active == true;
+
+      // Só admins criam, editam ou removem sorteios.
+      allow create: if isAdmin()
+        && eventSlug == request.resource.data.slug
+        && validEventData();
+
+      allow update: if isAdmin()
+        && eventSlug == request.resource.data.slug
+        && validEventData();
+
+      allow delete: if isAdmin();
+
+      match /participants/{whatsapp} {
+        // Cadastro público apenas em sorteio existente e ativo.
+        // A duplicidade é impedida porque o ID do documento é o WhatsApp normalizado.
+        allow create: if eventIsActive(eventSlug)
+          && !exists(/databases/$(database)/documents/events/$(eventSlug)/participants/$(whatsapp))
+          && validParticipantData(whatsapp);
+
+        // Dados dos participantes não ficam públicos.
+        allow read, update, delete: if isAdmin();
+      }
+
+      match /winners/{winnerId} {
+        // Sorteio e histórico de vencedores ficam apenas no painel admin.
+        allow read, create, update, delete: if isAdmin();
+      }
+    }
+  }
+}
