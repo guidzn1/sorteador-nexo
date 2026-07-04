@@ -3,23 +3,10 @@ import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { db } from '../firebaseClient'
 import { isValidBrazilWhatsapp, normalizeWhatsapp } from '../lib/utils'
 
-const SPORTS = [
-  'Futebol',
-  'Vôlei',
-  'Basquete',
-  'Corrida',
-  'Ciclismo',
-  'Natação',
-  'Jiu-Jitsu / MMA',
-  'Musculação / Crossfit',
-  'Outra',
-]
-
 const initialState = {
   full_name: '',
   whatsapp: '',
   instagram: '',
-  sport: SPORTS[0],
 }
 
 export default function ParticipantForm({ eventSlug }) {
@@ -35,9 +22,17 @@ export default function ParticipantForm({ eventSlug }) {
 
   function validate() {
     const next = {}
-    if (!form.full_name.trim()) next.full_name = 'Informe seu nome completo.'
-    if (!normalizeWhatsapp(form.whatsapp)) next.whatsapp = 'Informe seu WhatsApp.'
-    else if (!isValidBrazilWhatsapp(form.whatsapp)) next.whatsapp = 'Informe um WhatsApp válido com DDD.'
+
+    if (!form.full_name.trim()) {
+      next.full_name = 'Informe seu nome completo.'
+    }
+
+    if (!normalizeWhatsapp(form.whatsapp)) {
+      next.whatsapp = 'Informe seu WhatsApp.'
+    } else if (!isValidBrazilWhatsapp(form.whatsapp)) {
+      next.whatsapp = 'Informe um WhatsApp válido com DDD.'
+    }
+
     setErrors(next)
     return Object.keys(next).length === 0
   }
@@ -51,13 +46,10 @@ export default function ParticipantForm({ eventSlug }) {
     const participantRef = doc(db, 'events', eventSlug, 'participants', whatsapp)
 
     try {
-      // Não fazemos leitura pública para verificar duplicidade.
-      // O documento usa o WhatsApp como ID; se já existir, as regras do Firestore bloqueiam.
       await setDoc(participantRef, {
         fullName: form.full_name.trim(),
         whatsapp,
         instagram: form.instagram.trim() || null,
-        sport: form.sport,
         createdAt: serverTimestamp(),
       })
 
@@ -75,25 +67,32 @@ export default function ParticipantForm({ eventSlug }) {
 
   if (status === 'success') {
     return (
-      <div className="rounded-2xl border border-success/30 bg-success/10 p-8 text-center">
-        <p className="font-display text-xl font-semibold text-success">Cadastro confirmado!</p>
-        <p className="mt-2 text-muted">Boa sorte no sorteio.</p>
+      <div className="rounded-[2rem] border border-success/30 bg-success/10 p-8 text-center shadow-2xl shadow-success/5">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success/15 text-2xl">
+          ✓
+        </div>
+
+        <p className="mt-4 font-display text-xl font-semibold text-success">
+          Cadastro confirmado!
+        </p>
+
+        <p className="mt-2 text-muted">
+          Boa sorte no sorteio. Agora é só torcer.
+        </p>
       </div>
     )
   }
 
   if (status === 'duplicate') {
     return (
-      <div className="rounded-2xl border border-blue/30 bg-blue/10 p-8 text-center">
-        <p className="font-display text-xl font-semibold text-blue-dim">
-          Você já está participando desse sorteio.
+      <div className="rounded-[2rem] border border-blue/30 bg-blue/10 p-8 text-center shadow-2xl shadow-blue/5">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue/15 text-2xl">
+          i
+        </div>
+
+        <p className="mt-4 font-display text-xl font-semibold text-blue-dim">
+          Você já está participando do sorteio.
         </p>
-        <button
-          onClick={() => setStatus('idle')}
-          className="mt-4 text-sm text-muted underline underline-offset-4 hover:text-ink"
-        >
-          Voltar ao formulário
-        </button>
       </div>
     )
   }
@@ -133,22 +132,8 @@ export default function ParticipantForm({ eventSlug }) {
         />
       </Field>
 
-      <Field label="Modalidade esportiva">
-        <select
-          value={form.sport}
-          onChange={(e) => update('sport', e.target.value)}
-          className={inputClass()}
-        >
-          {SPORTS.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </Field>
-
       {status === 'error' && (
-        <p className="text-sm text-blue-dim">
+        <p className="rounded-xl border border-blue/25 bg-blue/10 px-4 py-3 text-sm text-blue-dim">
           Não foi possível concluir o cadastro. Tente novamente em instantes.
         </p>
       )}
@@ -156,10 +141,15 @@ export default function ParticipantForm({ eventSlug }) {
       <button
         type="submit"
         disabled={status === 'loading'}
-        className="w-full rounded-xl bg-blue py-4 font-display font-semibold uppercase tracking-wide text-ink transition hover:bg-blue-dim disabled:opacity-60"
+        className="group flex w-full items-center justify-center gap-2 rounded-2xl bg-blue px-5 py-4 font-display font-semibold uppercase tracking-wide text-ink shadow-2xl shadow-blue/20 transition hover:-translate-y-0.5 hover:bg-blue-dim disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {status === 'loading' ? 'Enviando...' : 'Participar do sorteio'}
+        <span className="transition group-hover:translate-x-1">→</span>
       </button>
+
+      <p className="text-center text-xs leading-relaxed text-muted">
+        Seus dados serão usados apenas para identificar sua participação neste sorteio.
+      </p>
     </form>
   )
 }
@@ -167,19 +157,23 @@ export default function ParticipantForm({ eventSlug }) {
 function Field({ label, required, error, children }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-muted">
-        {label} {required && <span className="text-blue-dim">*</span>}
+      <span className="mb-2 flex items-center justify-between text-sm font-medium text-muted">
+        <span>
+          {label} {required && <span className="text-blue-dim">*</span>}
+        </span>
+
+        {error && <span className="text-xs text-blue-dim">{error}</span>}
       </span>
+
       {children}
-      {error && <span className="mt-1 block text-xs text-blue-dim">{error}</span>}
     </label>
   )
 }
 
 function inputClass(error) {
   return [
-    'w-full rounded-xl border bg-elevated px-4 py-3 text-ink placeholder:text-muted/60',
-    'focus:border-blue focus:outline-none focus:ring-1 focus:ring-blue',
+    'w-full rounded-2xl border bg-elevated/80 px-4 py-4 text-ink placeholder:text-muted/60 shadow-inner shadow-black/10 transition',
+    'focus:border-blue focus:bg-elevated focus:outline-none focus:ring-4 focus:ring-blue/15',
     error ? 'border-blue-dim' : 'border-border',
   ].join(' ')
 }
