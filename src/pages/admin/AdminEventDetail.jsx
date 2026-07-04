@@ -204,10 +204,10 @@ export default function AdminEventDetail() {
         ← Todos os sorteios
       </Link>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
-        <div>
+      <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-2xl font-bold">{event.name}</h1>
+            <h1 className="break-words font-display text-2xl font-bold">{event.name}</h1>
 
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -223,7 +223,7 @@ export default function AdminEventDetail() {
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid w-full grid-cols-3 gap-2 sm:max-w-md lg:w-auto">
           <Metric label="Participantes" value={participants.length} />
           <Metric label="Aptos" value={eligibleParticipants.length} />
           <Metric label="Ganhadores" value={winners.length} />
@@ -243,12 +243,34 @@ export default function AdminEventDetail() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por nome, WhatsApp ou Instagram"
-              className="w-full max-w-sm rounded-xl border border-border bg-elevated px-4 py-2.5 text-sm focus:border-blue focus:outline-none focus:ring-4 focus:ring-blue/15"
+              placeholder="Buscar participante"
+              className="w-full rounded-xl border border-border bg-elevated px-4 py-3 text-sm focus:border-blue focus:outline-none focus:ring-4 focus:ring-blue/15 sm:max-w-sm"
             />
           </div>
 
-          <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="mt-4 space-y-3 md:hidden">
+            {filtered.length === 0 && (
+              <div className="rounded-2xl border border-border bg-card p-5 text-center text-sm text-muted">
+                Nenhum participante encontrado.
+              </div>
+            )}
+
+            {filtered.map((p) => {
+              const alreadyWon = winnerParticipantIds.has(p.id)
+
+              return (
+                <ParticipantCard
+                  key={p.id}
+                  participant={p}
+                  alreadyWon={alreadyWon}
+                  eventName={event.name}
+                  onRemove={() => removeParticipant(p.id)}
+                />
+              )
+            })}
+          </div>
+
+          <div className="mt-4 hidden overflow-hidden rounded-2xl border border-border bg-card md:block">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[860px] text-left text-sm">
                 <thead className="bg-elevated text-xs uppercase tracking-wide text-muted">
@@ -284,15 +306,7 @@ export default function AdminEventDetail() {
                         <td className="px-4 py-3 text-muted">{p.instagram || '—'}</td>
 
                         <td className="px-4 py-3">
-                          {alreadyWon ? (
-                            <span className="rounded-full bg-yellow-400/15 px-3 py-1 text-xs font-semibold text-yellow-200">
-                              Já ganhou
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-success/15 px-3 py-1 text-xs font-semibold text-success">
-                              Apto
-                            </span>
-                          )}
+                          <StatusBadge alreadyWon={alreadyWon} />
                         </td>
 
                         <td className="px-4 py-3 text-right">
@@ -300,7 +314,7 @@ export default function AdminEventDetail() {
                             <a
                               href={buildWhatsappUrl(
                                 p.whatsapp,
-                                `Olá, ${firstName(p.fullName)}! Aqui é da Nexo. Estou entrando em contato sobre o sorteio que você participou.`
+                                `Olá, ${firstName(p.fullName)}! Aqui é da Nexo. Estou entrando em contato sobre o sorteio "${event.name}".`
                               )}
                               target="_blank"
                               rel="noreferrer"
@@ -328,11 +342,11 @@ export default function AdminEventDetail() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="rounded-2xl border border-border bg-card p-4 sm:p-6">
             <h2 className="font-display text-lg font-semibold">Sortear ganhadores</h2>
 
             <p className="mt-1 text-sm leading-6 text-muted">
-              O sorteio usa apenas participantes aptos. Quem já ganhou neste sorteio fica fora das próximas rodadas.
+              O sorteio usa apenas participantes aptos. Quem já ganhou fica fora das próximas rodadas.
             </p>
 
             <div className="mt-4 rounded-xl border border-border bg-elevated px-4 py-3">
@@ -380,36 +394,14 @@ export default function AdminEventDetail() {
 
                 <div className="mt-3 space-y-3">
                   {lastWinners.map((winner) => (
-                    <div key={winner.id} className="rounded-xl border border-success/20 bg-base/30 p-3">
-                      <p className="text-xs text-success">#{winner.drawPosition}</p>
-
-                      <p className="mt-1 font-display font-semibold">{winner.fullName}</p>
-
-                      <p className="font-mono text-sm text-muted">
-                        {formatWhatsappDisplay(winner.whatsapp)}
-                      </p>
-
-                      <p className="text-sm text-muted">{winner.instagram || '—'}</p>
-
-                      <a
-                        href={buildWhatsappUrl(
-                          winner.whatsapp,
-                          `Olá, ${firstName(winner.fullName)}! Parabéns! Você foi sorteado(a) no sorteio da Nexo. Podemos falar por aqui?`
-                        )}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-3 inline-flex rounded-lg border border-success/30 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-success transition hover:bg-success/10"
-                      >
-                        Avisar no WhatsApp
-                      </a>
-                    </div>
+                    <WinnerCard key={winner.id} winner={winner} eventName={event.name} />
                   ))}
                 </div>
               </div>
             )}
           </div>
 
-          <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="rounded-2xl border border-border bg-card p-4 sm:p-6">
             <h2 className="font-display text-lg font-semibold">Histórico de ganhadores</h2>
 
             <div className="mt-3 space-y-3">
@@ -418,37 +410,7 @@ export default function AdminEventDetail() {
               )}
 
               {winners.map((w) => (
-                <div key={w.id} className="border-t border-border pt-3 first:border-0 first:pt-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-display font-semibold">{w.fullName}</p>
-
-                      <p className="font-mono text-xs text-muted">
-                        {formatWhatsappDisplay(w.whatsapp)} · {w.instagram || '—'}
-                      </p>
-
-                      <p className="text-xs text-muted">{formatDateTime(w.drawnAt)}</p>
-
-                      <a
-                        href={buildWhatsappUrl(
-                          w.whatsapp,
-                          `Olá, ${firstName(w.fullName)}! Parabéns! Você foi sorteado(a) no sorteio da Nexo. Podemos falar por aqui?`
-                        )}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-2 inline-flex rounded-lg border border-success/30 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-success transition hover:bg-success/10"
-                      >
-                        WhatsApp
-                      </a>
-                    </div>
-
-                    {w.drawPosition && (
-                      <span className="rounded-full bg-blue/10 px-2 py-1 text-xs font-semibold text-blue-dim">
-                        #{w.drawPosition}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <WinnerHistoryItem key={w.id} winner={w} eventName={event.name} />
               ))}
             </div>
           </div>
@@ -460,9 +422,135 @@ export default function AdminEventDetail() {
 
 function Metric({ label, value }) {
   return (
-    <div className="rounded-xl border border-border bg-card px-5 py-3 text-center">
-      <p className="font-display text-3xl font-bold text-blue-dim">{value}</p>
-      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
+    <div className="rounded-xl border border-border bg-card px-2 py-3 text-center sm:px-5">
+      <p className="font-display text-2xl font-bold text-blue-dim sm:text-3xl">{value}</p>
+      <p className="text-[10px] uppercase tracking-wide text-muted sm:text-xs">{label}</p>
+    </div>
+  )
+}
+
+function ParticipantCard({ participant, alreadyWon, eventName, onRemove }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-xl shadow-black/10">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="break-words font-display text-lg font-semibold">
+            {participant.fullName}
+          </p>
+
+          <p className="mt-1 font-mono text-sm text-muted">
+            {formatWhatsappDisplay(participant.whatsapp)}
+          </p>
+
+          <p className="mt-1 break-words text-sm text-muted">
+            {participant.instagram || 'Sem Instagram'}
+          </p>
+        </div>
+
+        <StatusBadge alreadyWon={alreadyWon} />
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <a
+          href={buildWhatsappUrl(
+            participant.whatsapp,
+            `Olá, ${firstName(participant.fullName)}! Aqui é da Nexo. Estou entrando em contato sobre o sorteio "${eventName}".`
+          )}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-xl border border-success/30 px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-success transition hover:bg-success/10"
+        >
+          WhatsApp
+        </a>
+
+        <button
+          type="button"
+          onClick={onRemove}
+          className="rounded-xl border border-border px-3 py-3 text-xs font-medium uppercase tracking-wide text-muted transition hover:border-blue hover:text-blue-dim"
+        >
+          Remover
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function StatusBadge({ alreadyWon }) {
+  if (alreadyWon) {
+    return (
+      <span className="shrink-0 rounded-full bg-yellow-400/15 px-3 py-1 text-xs font-semibold text-yellow-200">
+        Já ganhou
+      </span>
+    )
+  }
+
+  return (
+    <span className="shrink-0 rounded-full bg-success/15 px-3 py-1 text-xs font-semibold text-success">
+      Apto
+    </span>
+  )
+}
+
+function WinnerCard({ winner, eventName }) {
+  return (
+    <div className="rounded-xl border border-success/20 bg-base/30 p-3">
+      <p className="text-xs text-success">#{winner.drawPosition}</p>
+
+      <p className="mt-1 break-words font-display font-semibold">{winner.fullName}</p>
+
+      <p className="font-mono text-sm text-muted">
+        {formatWhatsappDisplay(winner.whatsapp)}
+      </p>
+
+      <p className="break-words text-sm text-muted">{winner.instagram || '—'}</p>
+
+      <a
+        href={buildWhatsappUrl(
+          winner.whatsapp,
+          `Olá, ${firstName(winner.fullName)}! Parabéns! Você foi sorteado(a) no sorteio "${eventName}" da Nexo. Podemos falar por aqui?`
+        )}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-3 inline-flex w-full justify-center rounded-lg border border-success/30 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-success transition hover:bg-success/10 sm:w-auto"
+      >
+        Avisar no WhatsApp
+      </a>
+    </div>
+  )
+}
+
+function WinnerHistoryItem({ winner, eventName }) {
+  return (
+    <div className="border-t border-border pt-3 first:border-0 first:pt-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="break-words font-display font-semibold">{winner.fullName}</p>
+
+          <p className="break-all font-mono text-xs text-muted">
+            {formatWhatsappDisplay(winner.whatsapp)} · {winner.instagram || '—'}
+          </p>
+
+          <p className="text-xs text-muted">{formatDateTime(winner.drawnAt)}</p>
+
+          <a
+            href={buildWhatsappUrl(
+              winner.whatsapp,
+              `Olá, ${firstName(winner.fullName)}! Parabéns! Você foi sorteado(a) no sorteio "${eventName}" da Nexo. Podemos falar por aqui?`
+            )}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex w-full justify-center rounded-lg border border-success/30 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-success transition hover:bg-success/10 sm:w-auto"
+          >
+            WhatsApp
+          </a>
+        </div>
+
+        {winner.drawPosition && (
+          <span className="w-fit rounded-full bg-blue/10 px-2 py-1 text-xs font-semibold text-blue-dim">
+            #{winner.drawPosition}
+          </span>
+        )}
+      </div>
     </div>
   )
 }

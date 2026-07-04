@@ -28,10 +28,13 @@ export default function AdminEvents() {
 
   async function loadEvents() {
     setLoading(true)
+
     try {
       const snap = await getDocs(collection(db, 'events'))
       const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+
       list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+
       setEvents(list)
     } catch (err) {
       console.error(err)
@@ -103,6 +106,7 @@ export default function AdminEvents() {
         active: !ev.active,
         updatedAt: serverTimestamp(),
       })
+
       await loadEvents()
     } catch (err) {
       console.error(err)
@@ -155,13 +159,15 @@ export default function AdminEvents() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold">Sorteios</h1>
-          <p className="mt-1 text-sm text-muted">Crie, encerre, exclua e gerencie os sorteios da Nexo.</p>
+          <p className="mt-1 text-sm text-muted">
+            Crie, encerre, exclua e gerencie os sorteios da Nexo.
+          </p>
         </div>
 
         <button
           type="button"
           onClick={() => setShowForm((s) => !s)}
-          className="rounded-xl bg-blue px-5 py-3 font-display text-sm font-semibold uppercase tracking-wide transition hover:bg-blue-dim"
+          className="w-full rounded-xl bg-blue px-5 py-3 font-display text-sm font-semibold uppercase tracking-wide transition hover:bg-blue-dim sm:w-auto"
         >
           {showForm ? 'Cancelar' : 'Novo sorteio'}
         </button>
@@ -176,9 +182,9 @@ export default function AdminEvents() {
       {showForm && (
         <form
           onSubmit={handleCreate}
-          className="mt-6 space-y-4 rounded-2xl border border-border bg-card p-6 shadow-2xl shadow-black/10"
+          className="mt-6 space-y-4 rounded-2xl border border-border bg-card p-4 shadow-2xl shadow-black/10 sm:p-6"
         >
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-muted">Nome do sorteio</span>
               <input
@@ -200,7 +206,7 @@ export default function AdminEvents() {
                     setSlug(slugify(e.target.value))
                   }}
                   placeholder="camisa-julho"
-                  className="w-full bg-transparent outline-none"
+                  className="min-w-0 flex-1 bg-transparent outline-none"
                 />
               </div>
             </label>
@@ -211,7 +217,7 @@ export default function AdminEvents() {
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={2}
+              rows={3}
               placeholder="Ex: concorra a uma camisa oficial da Nexo."
               className="w-full rounded-xl border border-border bg-elevated px-4 py-3 focus:border-blue focus:outline-none focus:ring-4 focus:ring-blue/15"
             />
@@ -220,7 +226,7 @@ export default function AdminEvents() {
           <button
             type="submit"
             disabled={saving}
-            className="rounded-xl bg-blue px-6 py-3 font-display text-sm font-semibold uppercase tracking-wide transition hover:bg-blue-dim disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-xl bg-blue px-6 py-3 font-display text-sm font-semibold uppercase tracking-wide transition hover:bg-blue-dim disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             {saving ? 'Criando...' : 'Criar sorteio'}
           </button>
@@ -239,66 +245,71 @@ export default function AdminEvents() {
         {events.map((ev) => (
           <div
             key={ev.id}
-            className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-2xl shadow-black/10 sm:flex-row sm:items-center sm:justify-between"
+            className="rounded-2xl border border-border bg-card p-4 shadow-2xl shadow-black/10 sm:p-5"
           >
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  to={`/admin/eventos/${ev.id}`}
-                  className="font-display text-lg font-semibold hover:text-blue-dim"
-                >
-                  {ev.name}
-                </Link>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    to={`/admin/eventos/${ev.id}`}
+                    className="break-words font-display text-lg font-semibold hover:text-blue-dim"
+                  >
+                    {ev.name}
+                  </Link>
 
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    ev.active ? 'bg-success/15 text-success' : 'bg-muted/15 text-muted'
-                  }`}
-                >
-                  {ev.active ? 'Ativo' : 'Encerrado'}
-                </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      ev.active ? 'bg-success/15 text-success' : 'bg-muted/15 text-muted'
+                    }`}
+                  >
+                    {ev.active ? 'Ativo' : 'Encerrado'}
+                  </span>
+                </div>
+
+                {ev.description && (
+                  <p className="mt-1 break-words text-sm text-muted">{ev.description}</p>
+                )}
+
+                <p className="mt-2 break-all font-mono text-xs text-muted">
+                  {window.location.origin}/s/{ev.id}
+                </p>
+
+                <p className="mt-1 text-xs text-muted">Criado em {formatDateTime(ev.createdAt)}</p>
               </div>
 
-              {ev.description && <p className="mt-1 text-sm text-muted">{ev.description}</p>}
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => copyLink(ev)}
+                  className="rounded-lg border border-border px-3 py-2 text-xs font-medium uppercase tracking-wide transition hover:border-blue hover:text-blue-dim"
+                >
+                  {copiedId === ev.id ? 'Copiado!' : 'Copiar'}
+                </button>
 
-              <p className="mt-2 break-all font-mono text-xs text-muted">
-                {window.location.origin}/s/{ev.id}
-              </p>
-              <p className="mt-1 text-xs text-muted">Criado em {formatDateTime(ev.createdAt)}</p>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => toggleActive(ev)}
+                  className="rounded-lg border border-border px-3 py-2 text-xs font-medium uppercase tracking-wide transition hover:border-blue hover:text-blue-dim"
+                >
+                  {ev.active ? 'Encerrar' : 'Reabrir'}
+                </button>
 
-            <div className="flex flex-wrap gap-2 sm:justify-end">
-              <button
-                type="button"
-                onClick={() => copyLink(ev)}
-                className="rounded-lg border border-border px-3 py-2 text-xs font-medium uppercase tracking-wide transition hover:border-blue hover:text-blue-dim"
-              >
-                {copiedId === ev.id ? 'Copiado!' : 'Copiar link'}
-              </button>
+                <Link
+                  to={`/admin/eventos/${ev.id}`}
+                  className="rounded-lg bg-blue px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide transition hover:bg-blue-dim"
+                >
+                  Gerenciar
+                </Link>
 
-              <button
-                type="button"
-                onClick={() => toggleActive(ev)}
-                className="rounded-lg border border-border px-3 py-2 text-xs font-medium uppercase tracking-wide transition hover:border-blue hover:text-blue-dim"
-              >
-                {ev.active ? 'Encerrar' : 'Reabrir'}
-              </button>
-
-              <Link
-                to={`/admin/eventos/${ev.id}`}
-                className="rounded-lg bg-blue px-3 py-2 text-xs font-semibold uppercase tracking-wide transition hover:bg-blue-dim"
-              >
-                Gerenciar
-              </Link>
-
-              <button
-                type="button"
-                onClick={() => deleteEvent(ev)}
-                disabled={deletingId === ev.id}
-                className="rounded-lg border border-red-400/30 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-red-300 transition hover:border-red-300 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {deletingId === ev.id ? 'Excluindo...' : 'Excluir'}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => deleteEvent(ev)}
+                  disabled={deletingId === ev.id}
+                  className="rounded-lg border border-red-400/30 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-red-300 transition hover:border-red-300 hover:bg-red-400/10 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {deletingId === ev.id ? 'Excluindo...' : 'Excluir'}
+                </button>
+              </div>
             </div>
           </div>
         ))}
