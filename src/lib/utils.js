@@ -1,60 +1,77 @@
-// Normaliza WhatsApp para impedir duplicidade entre números com e sem +55.
-// Exemplo: +55 (94) 99999-9999 e (94) 99999-9999 viram 94999999999.
-export function normalizeWhatsapp(value) {
-  let digits = String(value || '').replace(/\D/g, '')
-
-  if (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) {
-    digits = digits.slice(2)
-  }
-
-  return digits
-}
-
-export function isValidBrazilWhatsapp(value) {
-  const digits = normalizeWhatsapp(value)
-  return digits.length === 10 || digits.length === 11
-}
-
-export function formatWhatsappDisplay(digits) {
-  const d = normalizeWhatsapp(digits)
-  if (d.length === 11) {
-    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
-  }
-  if (d.length === 10) {
-    return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
-  }
-  return d
-}
-
-// Aceita: string ISO, objeto Date, ou Firestore Timestamp ({ seconds }) /
-// resultado de serverTimestamp() já resolvido pelo SDK.
-export function formatDateTime(value) {
-  if (!value) return '—'
-  let date
-  if (typeof value?.toDate === 'function') {
-    date = value.toDate()
-  } else if (typeof value?.seconds === 'number') {
-    date = new Date(value.seconds * 1000)
-  } else {
-    date = new Date(value)
-  }
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-export function slugify(text) {
-  return String(text || '')
+export function slugify(value) {
+  return String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+export function normalizeWhatsapp(value) {
+  let digits = String(value || '').replace(/\D/g, '')
+
+  // Aceita quando a pessoa cola com +55 ou 55 no início.
+  // Ex: +55 (94) 99999-9999 -> 94999999999
+  if (digits.startsWith('55') && digits.length > 11) {
+    digits = digits.slice(2)
+  }
+
+  // Limite: DDD com 2 dígitos + celular com 9 dígitos = 11
+  return digits.slice(0, 11)
+}
+
+export function formatWhatsappInput(value) {
+  const digits = normalizeWhatsapp(value)
+
+  if (digits.length <= 2) {
+    return digits
+  }
+
+  if (digits.length <= 7) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+  }
+
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`
+}
+
+export function isValidBrazilWhatsapp(value) {
+  const digits = normalizeWhatsapp(value)
+
+  // DDD + 9 números
+  if (digits.length !== 11) return false
+
+  const ddd = digits.slice(0, 2)
+  const phone = digits.slice(2)
+
+  // DDD não pode começar com 0
+  if (ddd[0] === '0') return false
+
+  // Celular brasileiro deve começar com 9
+  if (phone[0] !== '9') return false
+
+  return true
+}
+
+export function formatWhatsappDisplay(value) {
+  const digits = normalizeWhatsapp(value)
+
+  if (digits.length === 11) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+  }
+
+  return digits || '—'
+}
+
+export function formatDateTime(value) {
+  if (!value) return '—'
+
+  const date = value?.toDate ? value.toDate() : new Date(value)
+
+  if (Number.isNaN(date.getTime())) return '—'
+
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(date)
 }

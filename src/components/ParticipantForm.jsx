@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { db } from '../firebaseClient'
-import { isValidBrazilWhatsapp, normalizeWhatsapp } from '../lib/utils'
+import {
+  formatWhatsappInput,
+  isValidBrazilWhatsapp,
+  normalizeWhatsapp,
+} from '../lib/utils'
 
 const initialState = {
   full_name: '',
@@ -15,22 +19,32 @@ export default function ParticipantForm({ eventSlug }) {
   const [status, setStatus] = useState('idle') // idle | loading | success | duplicate | error
 
   function update(field, value) {
-    setForm((f) => ({ ...f, [field]: value }))
+    let nextValue = value
+
+    if (field === 'whatsapp') {
+      nextValue = formatWhatsappInput(value)
+    }
+
+    setForm((f) => ({ ...f, [field]: nextValue }))
     setErrors((e) => ({ ...e, [field]: null }))
+
     if (status !== 'idle') setStatus('idle')
   }
 
   function validate() {
     const next = {}
+    const whatsappDigits = normalizeWhatsapp(form.whatsapp)
 
     if (!form.full_name.trim()) {
       next.full_name = 'Informe seu nome completo.'
     }
 
-    if (!normalizeWhatsapp(form.whatsapp)) {
+    if (!whatsappDigits) {
       next.whatsapp = 'Informe seu WhatsApp.'
+    } else if (whatsappDigits.length < 11) {
+      next.whatsapp = 'Digite o DDD + 9 números.'
     } else if (!isValidBrazilWhatsapp(form.whatsapp)) {
-      next.whatsapp = 'Informe um WhatsApp válido com DDD.'
+      next.whatsapp = 'WhatsApp inválido.'
     }
 
     setErrors(next)
@@ -42,6 +56,7 @@ export default function ParticipantForm({ eventSlug }) {
     if (!validate()) return
 
     setStatus('loading')
+
     const whatsapp = normalizeWhatsapp(form.whatsapp)
     const participantRef = doc(db, 'events', eventSlug, 'participants', whatsapp)
 
@@ -110,14 +125,21 @@ export default function ParticipantForm({ eventSlug }) {
         />
       </Field>
 
-      <Field label="WhatsApp" required error={errors.whatsapp}>
+      <Field
+        label="WhatsApp"
+        required
+        error={errors.whatsapp}
+        helper={`${normalizeWhatsapp(form.whatsapp).length}/11 dígitos`}
+      >
         <input
           type="tel"
           value={form.whatsapp}
           onChange={(e) => update('whatsapp', e.target.value)}
-          placeholder="(00) 00000-0000"
+          placeholder="(94) 99999-9999"
           className={inputClass(errors.whatsapp)}
           autoComplete="tel"
+          inputMode="numeric"
+          maxLength={15}
         />
       </Field>
 
@@ -154,15 +176,19 @@ export default function ParticipantForm({ eventSlug }) {
   )
 }
 
-function Field({ label, required, error, children }) {
+function Field({ label, required, error, helper, children }) {
   return (
     <label className="block">
-      <span className="mb-2 flex items-center justify-between text-sm font-medium text-muted">
+      <span className="mb-2 flex items-center justify-between gap-3 text-sm font-medium text-muted">
         <span>
           {label} {required && <span className="text-blue-dim">*</span>}
         </span>
 
-        {error && <span className="text-xs text-blue-dim">{error}</span>}
+        {error ? (
+          <span className="text-right text-xs text-blue-dim">{error}</span>
+        ) : helper ? (
+          <span className="text-right text-xs text-muted/70">{helper}</span>
+        ) : null}
       </span>
 
       {children}

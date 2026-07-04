@@ -29,6 +29,7 @@ export default function AdminEventDetail() {
 
     try {
       const eventRef = doc(db, 'events', slug)
+
       const [evSnap, partsSnap, winsSnap] = await Promise.all([
         getDoc(eventRef),
         getDocs(collection(db, 'events', slug, 'participants')),
@@ -56,6 +57,14 @@ export default function AdminEventDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug])
 
+  const winnerParticipantIds = useMemo(() => {
+    return new Set(winners.map((winner) => winner.participantId).filter(Boolean))
+  }, [winners])
+
+  const eligibleParticipants = useMemo(() => {
+    return participants.filter((participant) => !winnerParticipantIds.has(participant.id))
+  }, [participants, winnerParticipantIds])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     const qDigits = normalizeWhatsapp(search)
@@ -70,7 +79,14 @@ export default function AdminEventDetail() {
     })
   }, [participants, search])
 
-  const safeDrawCount = Math.min(Math.max(Number(drawCount) || 1, 1), participants.length || 1)
+  const maxEligible = eligibleParticipants.length
+
+  const safeDrawCount = useMemo(() => {
+    if (maxEligible === 0) return 1
+
+    const parsed = Number(drawCount) || 1
+    return Math.min(Math.max(parsed, 1), maxEligible)
+  }, [drawCount, maxEligible])
 
   async function removeParticipant(participantId) {
     if (!window.confirm('Remover este participante do sorteio?')) return
@@ -111,13 +127,18 @@ export default function AdminEventDetail() {
       return
     }
 
-    if (safeDrawCount > participants.length) {
-      setDrawError('A quantidade de ganhadores não pode ser maior que a quantidade de participantes.')
+    if (eligibleParticipants.length === 0) {
+      setDrawError('Todos os participantes cadastrados já ganharam neste sorteio.')
+      return
+    }
+
+    if (safeDrawCount > eligibleParticipants.length) {
+      setDrawError('A quantidade de ganhadores não pode ser maior que a quantidade de participantes aptos.')
       return
     }
 
     const confirmed = window.confirm(
-      `Sortear ${safeDrawCount} ganhador${safeDrawCount > 1 ? 'es' : ''} entre ${participants.length} participante${participants.length > 1 ? 's' : ''}?`
+      `Sortear ${safeDrawCount} ganhador${safeDrawCount > 1 ? 'es' : ''} entre ${eligibleParticipants.length} participante${eligibleParticipants.length > 1 ? 's' : ''} apto${eligibleParticipants.length > 1 ? 's' : ''}?`
     )
 
     if (!confirmed) return
@@ -126,7 +147,7 @@ export default function AdminEventDetail() {
 
     try {
       const drawGroupId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      const selected = pickRandomParticipants(participants, safeDrawCount)
+      const selected = pickRandomParticipants(eligibleParticipants, safeDrawCount)
 
       await Promise.all(
         selected.map((winner, index) =>
@@ -187,6 +208,7 @@ export default function AdminEventDetail() {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-display text-2xl font-bold">{event.name}</h1>
+
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                 event.active ? 'bg-success/15 text-success' : 'bg-muted/15 text-muted'
@@ -195,13 +217,15 @@ export default function AdminEventDetail() {
               {event.active ? 'Ativo' : 'Encerrado'}
             </span>
           </div>
+
           <p className="mt-1 break-all font-mono text-xs text-muted">
             {window.location.origin}/s/{event.id}
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <Metric label="Participantes" value={participants.length} />
+          <Metric label="Aptos" value={eligibleParticipants.length} />
           <Metric label="Ganhadores" value={winners.length} />
         </div>
       </div>
@@ -211,7 +235,9 @@ export default function AdminEventDetail() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="font-display text-lg font-semibold">Participantes</h2>
-              <p className="mt-1 text-sm text-muted">Lista de pessoas cadastradas neste sorteio.</p>
+              <p className="mt-1 text-sm text-muted">
+                Quem já ganhou fica marcado e não entra nos próximos sorteios.
+              </p>
             </div>
 
             <input
@@ -224,41 +250,77 @@ export default function AdminEventDetail() {
 
           <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[680px] text-left text-sm">
+              <table className="w-full min-w-[860px] text-left text-sm">
                 <thead className="bg-elevated text-xs uppercase tracking-wide text-muted">
                   <tr>
                     <th className="px-4 py-3">Nome</th>
                     <th className="px-4 py-3">WhatsApp</th>
                     <th className="px-4 py-3">Instagram</th>
-                    <th className="px-4 py-3 text-right">Ação</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Ações</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-4 py-6 text-center text-muted">
+                      <td colSpan={5} className="px-4 py-6 text-center text-muted">
                         Nenhum participante encontrado.
                       </td>
                     </tr>
                   )}
 
-                  {filtered.map((p) => (
-                    <tr key={p.id} className="border-t border-border">
-                      <td className="px-4 py-3">{p.fullName}</td>
-                      <td className="px-4 py-3 font-mono">{formatWhatsappDisplay(p.whatsapp)}</td>
-                      <td className="px-4 py-3 text-muted">{p.instagram || '—'}</td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => removeParticipant(p.id)}
-                          className="text-xs font-medium uppercase tracking-wide text-muted hover:text-blue-dim"
-                        >
-                          Remover
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filtered.map((p) => {
+                    const alreadyWon = winnerParticipantIds.has(p.id)
+
+                    return (
+                      <tr key={p.id} className="border-t border-border">
+                        <td className="px-4 py-3">{p.fullName}</td>
+
+                        <td className="px-4 py-3 font-mono">
+                          {formatWhatsappDisplay(p.whatsapp)}
+                        </td>
+
+                        <td className="px-4 py-3 text-muted">{p.instagram || '—'}</td>
+
+                        <td className="px-4 py-3">
+                          {alreadyWon ? (
+                            <span className="rounded-full bg-yellow-400/15 px-3 py-1 text-xs font-semibold text-yellow-200">
+                              Já ganhou
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-success/15 px-3 py-1 text-xs font-semibold text-success">
+                              Apto
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex justify-end gap-2">
+                            <a
+                              href={buildWhatsappUrl(
+                                p.whatsapp,
+                                `Olá, ${firstName(p.fullName)}! Aqui é da Nexo. Estou entrando em contato sobre o sorteio que você participou.`
+                              )}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-lg border border-success/30 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-success transition hover:bg-success/10"
+                            >
+                              WhatsApp
+                            </a>
+
+                            <button
+                              type="button"
+                              onClick={() => removeParticipant(p.id)}
+                              className="rounded-lg border border-border px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted transition hover:border-blue hover:text-blue-dim"
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -268,16 +330,29 @@ export default function AdminEventDetail() {
         <div className="space-y-6">
           <div className="rounded-2xl border border-border bg-card p-6">
             <h2 className="font-display text-lg font-semibold">Sortear ganhadores</h2>
+
             <p className="mt-1 text-sm leading-6 text-muted">
-              Escolhe aleatoriamente a quantidade definida. Dentro do mesmo clique, a pessoa não se repete.
+              O sorteio usa apenas participantes aptos. Quem já ganhou neste sorteio fica fora das próximas rodadas.
             </p>
 
+            <div className="mt-4 rounded-xl border border-border bg-elevated px-4 py-3">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-muted">Participantes aptos</span>
+                <span className="font-display text-xl font-bold text-blue-dim">
+                  {eligibleParticipants.length}
+                </span>
+              </div>
+            </div>
+
             <label className="mt-5 block">
-              <span className="mb-2 block text-sm font-medium text-muted">Quantidade de ganhadores</span>
+              <span className="mb-2 block text-sm font-medium text-muted">
+                Quantidade de ganhadores
+              </span>
+
               <input
                 type="number"
                 min="1"
-                max={Math.max(participants.length, 1)}
+                max={Math.max(eligibleParticipants.length, 1)}
                 value={drawCount}
                 onChange={(e) => setDrawCount(e.target.value)}
                 className="w-full rounded-xl border border-border bg-elevated px-4 py-3 focus:border-blue focus:outline-none focus:ring-4 focus:ring-blue/15"
@@ -287,10 +362,12 @@ export default function AdminEventDetail() {
             <button
               type="button"
               onClick={drawWinners}
-              disabled={drawing || participants.length === 0}
+              disabled={drawing || eligibleParticipants.length === 0}
               className="mt-4 w-full rounded-xl bg-blue py-3 font-display font-semibold uppercase tracking-wide transition hover:bg-blue-dim disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {drawing ? 'Sorteando...' : `Sortear ${safeDrawCount} ganhador${safeDrawCount > 1 ? 'es' : ''}`}
+              {drawing
+                ? 'Sorteando...'
+                : `Sortear ${safeDrawCount} ganhador${safeDrawCount > 1 ? 'es' : ''}`}
             </button>
 
             {drawError && <p className="mt-3 text-sm text-blue-dim">{drawError}</p>}
@@ -305,11 +382,26 @@ export default function AdminEventDetail() {
                   {lastWinners.map((winner) => (
                     <div key={winner.id} className="rounded-xl border border-success/20 bg-base/30 p-3">
                       <p className="text-xs text-success">#{winner.drawPosition}</p>
+
                       <p className="mt-1 font-display font-semibold">{winner.fullName}</p>
+
                       <p className="font-mono text-sm text-muted">
                         {formatWhatsappDisplay(winner.whatsapp)}
                       </p>
+
                       <p className="text-sm text-muted">{winner.instagram || '—'}</p>
+
+                      <a
+                        href={buildWhatsappUrl(
+                          winner.whatsapp,
+                          `Olá, ${firstName(winner.fullName)}! Parabéns! Você foi sorteado(a) no sorteio da Nexo. Podemos falar por aqui?`
+                        )}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-3 inline-flex rounded-lg border border-success/30 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-success transition hover:bg-success/10"
+                      >
+                        Avisar no WhatsApp
+                      </a>
                     </div>
                   ))}
                 </div>
@@ -330,10 +422,24 @@ export default function AdminEventDetail() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-display font-semibold">{w.fullName}</p>
+
                       <p className="font-mono text-xs text-muted">
                         {formatWhatsappDisplay(w.whatsapp)} · {w.instagram || '—'}
                       </p>
+
                       <p className="text-xs text-muted">{formatDateTime(w.drawnAt)}</p>
+
+                      <a
+                        href={buildWhatsappUrl(
+                          w.whatsapp,
+                          `Olá, ${firstName(w.fullName)}! Parabéns! Você foi sorteado(a) no sorteio da Nexo. Podemos falar por aqui?`
+                        )}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex rounded-lg border border-success/30 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-success transition hover:bg-success/10"
+                      >
+                        WhatsApp
+                      </a>
                     </div>
 
                     {w.drawPosition && (
@@ -359,4 +465,15 @@ function Metric({ label, value }) {
       <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
     </div>
   )
+}
+
+function buildWhatsappUrl(whatsapp, message) {
+  const digits = normalizeWhatsapp(whatsapp)
+  const phoneWithCountryCode = `55${digits}`
+
+  return `https://wa.me/${phoneWithCountryCode}?text=${encodeURIComponent(message)}`
+}
+
+function firstName(fullName) {
+  return String(fullName || '').trim().split(' ')[0] || 'tudo bem'
 }
